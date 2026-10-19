@@ -120,6 +120,24 @@ def test_step_limit_stops_infinite_loop():
     assert loop.llm.call_count == 3
 
 
+def test_default_config_stops_after_five_steps():
+    registry = ToolRegistry()
+
+    @registry.register(name="ping")
+    def ping() -> str:
+        return "pong"
+
+    loop = AgentLoop(
+        llm=FakeLLM([LLMResponse(content="", tool_calls=(tool_call("ping"),))]),
+        tools=registry,
+        config=Config(),
+    )
+    answer = loop.run("一直 ping")
+
+    assert "最大步数 5" in answer
+    assert loop.llm.call_count == 5
+
+
 def test_model_failure_is_converted_to_readable_text():
     loop = build_loop(ExplodingLLM())
     answer = loop.run("你好")

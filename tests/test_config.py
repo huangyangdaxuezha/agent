@@ -4,8 +4,19 @@ from meeting_agent.config import Config, load_config
 def test_defaults_are_offline_safe():
     config = load_config(env={})
     assert config.provider == "echo"
-    assert config.max_steps > 0
+    assert config.max_steps == 5
     assert config.max_history > 0
+
+
+def test_default_max_steps_is_five():
+    assert Config().max_steps == 5
+    assert load_config(env={}).max_steps == 5
+
+
+def test_max_steps_never_below_one():
+    assert load_config(env={"MEETING_AGENT_MAX_STEPS": "0"}).max_steps == 1
+    assert load_config(env={"MEETING_AGENT_MAX_STEPS": "-3"}).max_steps == 1
+    assert load_config(env={"MEETING_AGENT_MAX_STEPS": "12"}).max_steps == 12
 
 
 def test_reads_environment_with_prefix():
@@ -27,7 +38,7 @@ def test_reads_environment_with_prefix():
 def test_blank_values_fall_back_to_defaults():
     config = load_config(env={"MEETING_AGENT_PROVIDER": "   ", "MEETING_AGENT_MAX_STEPS": "abc"})
     assert config.provider == "echo"
-    assert config.max_steps == 8
+    assert config.max_steps == 5
 
 
 def test_overrides_ignore_none_values():

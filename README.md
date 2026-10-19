@@ -70,7 +70,7 @@ REPL 命令：`/help` `/history` `/clear` `/save [路径]` `/exit`。
 | `MEETING_AGENT_API_KEY` | 接口密钥 |
 | `MEETING_AGENT_MODEL` | 模型名称 |
 | `MEETING_AGENT_TEMPERATURE` | 采样温度，默认 0.3 |
-| `MEETING_AGENT_MAX_STEPS` | 单轮最大步数，默认 8 |
+| `MEETING_AGENT_MAX_STEPS` | 单轮最大循环步数，默认 5（最小 1） |
 | `MEETING_AGENT_MAX_HISTORY` | 保留的历史消息数，默认 40 |
 | `MEETING_AGENT_LOG_LEVEL` | 日志级别，默认 INFO |
 

@@ -19,7 +19,7 @@ class Config:
     base_url: str = ""
     api_key: str = ""
     temperature: float = 0.3
-    max_steps: int = 8
+    max_steps: int = 5
     max_history: int = 40
     log_level: str = "INFO"
 
@@ -58,7 +58,8 @@ def load_config(env: Mapping[str, str] | None = None, **overrides: object) -> Co
         base_url=_read_str(source, "BASE_URL", ""),
         api_key=_read_str(source, "API_KEY", ""),
         temperature=_read_number(source, "TEMPERATURE", 0.3),
-        max_steps=int(_read_number(source, "MAX_STEPS", 8)),
+        # 至少允许 1 步，避免误配成 0/负数后一轮对话什么都不做
+        max_steps=max(1, int(_read_number(source, "MAX_STEPS", 5))),
         max_history=int(_read_number(source, "MAX_HISTORY", 40)),
         log_level=_read_str(source, "LOG_LEVEL", "INFO"),
     )
