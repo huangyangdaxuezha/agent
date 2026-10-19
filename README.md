@@ -32,7 +32,15 @@ tests/                   # 单元测试（离线，不发网络请求）
 
 依赖方向单向：`cli → core → (llm / tools / memory)`，core 只依赖抽象接口。
 
-## 快速开始
+## 快速开始（Windows 双击）
+
+1. 双击 **`setup.cmd`**：创建 `.venv` 并安装依赖（首次约 1 分钟）
+2. 双击 **`run.cmd`**：启动 CLI（首次会自动生成 `.env` 并打开记事本让你填密钥）
+3. 关闭窗口即退出
+
+> 启动脚本内部固定使用项目内的 `.venv`，不依赖系统 `python` 命令。
+
+命令行方式：
 
 ```powershell
 # 1. 创建虚拟环境
@@ -67,6 +75,17 @@ REPL 命令：`/help` `/history` `/clear` `/save [路径]` `/exit`。
 | `MEETING_AGENT_LOG_LEVEL` | 日志级别，默认 INFO |
 
 `.env` 不入库；密钥只通过环境变量或命令行传入。
+
+DeepSeek 示例（改完重启 CLI 生效）：
+
+```ini
+MEETING_AGENT_PROVIDER=openai_compatible
+MEETING_AGENT_BASE_URL=https://api.deepseek.com/v1
+MEETING_AGENT_MODEL=deepseek-chat
+MEETING_AGENT_API_KEY=sk-你的密钥
+```
+
+密钥在 https://platform.deepseek.com/api_keys 创建。
 
 ## 测试
 
