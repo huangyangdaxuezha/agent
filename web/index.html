@@ -1,0 +1,231 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>会议小助手</title>
+<style>
+  :root {
+    --bg: #f4f6fb;
+    --card: #ffffff;
+    --brand: #4f46e5;
+    --brand-2: #6366f1;
+    --text: #1f2430;
+    --muted: #6b7280;
+    --line: #e6e8ef;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; height: 100vh; display: flex; flex-direction: column;
+    background: var(--bg); color: var(--text);
+    font-family: "Microsoft YaHei", "PingFang SC", system-ui, -apple-system, Segoe UI, sans-serif;
+  }
+  header {
+    background: linear-gradient(120deg, var(--brand), var(--brand-2));
+    color: #fff; padding: 14px 20px; display: flex; align-items: center; gap: 12px;
+    box-shadow: 0 2px 12px rgba(79, 70, 229, .25);
+  }
+  header h1 { font-size: 17px; margin: 0; font-weight: 600; letter-spacing: .5px; }
+  header .model {
+    font-size: 12px; background: rgba(255,255,255,.18); padding: 3px 10px;
+    border-radius: 999px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 45vw;
+  }
+  header .spacer { flex: 1; }
+  header button {
+    background: rgba(255,255,255,.16); border: 1px solid rgba(255,255,255,.35); color: #fff;
+    padding: 6px 14px; border-radius: 8px; cursor: pointer; font-size: 13px;
+  }
+  header button:hover { background: rgba(255,255,255,.28); }
+
+  main { flex: 1; overflow-y: auto; padding: 22px 16px; }
+  .wrap { max-width: 860px; margin: 0 auto; }
+  .msg { display: flex; margin-bottom: 16px; gap: 10px; align-items: flex-start; }
+  .msg.me { flex-direction: row-reverse; }
+  .avatar {
+    width: 32px; height: 32px; border-radius: 10px; flex: 0 0 32px;
+    display: flex; align-items: center; justify-content: center; font-size: 13px; color: #fff;
+  }
+  .msg.me .avatar { background: var(--brand); }
+  .msg.ai .avatar { background: #10b981; }
+  .bubble {
+    max-width: 74%; padding: 11px 14px; border-radius: 14px; line-height: 1.7;
+    font-size: 14px; white-space: pre-wrap; word-break: break-word;
+  }
+  .msg.me .bubble { background: var(--brand); color: #fff; border-top-right-radius: 4px; }
+  .msg.ai .bubble { background: var(--card); border: 1px solid var(--line); border-top-left-radius: 4px; }
+
+  .empty { text-align: center; color: var(--muted); margin-top: 12vh; }
+  .empty h2 { font-size: 20px; margin-bottom: 8px; color: var(--text); }
+  .empty ul { display: inline-block; text-align: left; color: var(--muted); font-size: 13px; line-height: 2; }
+
+  footer { border-top: 1px solid var(--line); background: var(--card); padding: 14px 16px; }
+  .input-row { max-width: 860px; margin: 0 auto; display: flex; gap: 10px; align-items: flex-end; }
+  textarea {
+    flex: 1; resize: none; border: 1px solid var(--line); border-radius: 12px; padding: 11px 13px;
+    font: inherit; font-size: 14px; line-height: 1.6; max-height: 160px; outline: none; background: #fbfcfe;
+  }
+  textarea:focus { border-color: var(--brand); background: #fff; }
+  .send {
+    background: var(--brand); color: #fff; border: none; border-radius: 12px; padding: 11px 22px;
+    font-size: 14px; cursor: pointer; height: 44px;
+  }
+  .send:disabled { background: #c7cbd8; cursor: not-allowed; }
+  .tip { max-width: 860px; margin: 8px auto 0; font-size: 12px; color: var(--muted); }
+  .thinking { display: inline-flex; gap: 4px; align-items: center; }
+  .thinking i { width: 6px; height: 6px; border-radius: 50%; background: var(--muted); animation: blink 1s infinite; }
+  .thinking i:nth-child(2) { animation-delay: .2s; }
+  .thinking i:nth-child(3) { animation-delay: .4s; }
+  @keyframes blink { 0%,80%,100% { opacity: .25 } 40% { opacity: 1 } }
+  .error { color: #dc2626; font-size: 13px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>会议小助手</h1>
+  <span class="model" id="model">加载中…</span>
+  <span class="spacer"></span>
+  <button id="clear">清空会话</button>
+</header>
+
+<main id="main">
+  <div class="wrap" id="list"></div>
+  <div class="empty" id="empty">
+    <h2>把会议内容交给我</h2>
+    <ul>
+      <li>整理会议纪要、结论与分歧点</li>
+      <li>抽取待办事项（负责人 / 截止时间）</li>
+      <li>基于会议记录回答具体问题</li>
+    </ul>
+  </div>
+</main>
+
+<footer>
+  <div class="input-row">
+    <textarea id="input" rows="1" placeholder="粘贴会议记录或输入问题…"></textarea>
+    <button class="send" id="send">发送</button>
+  </div>
+  <div class="tip">Enter 发送，Shift + Enter 换行</div>
+</footer>
+
+<script>
+  const KEY = 'meeting_agent_session';
+  let sessionId = localStorage.getItem(KEY) || '';
+  let sending = false;
+
+  const listEl = document.getElementById('list');
+  const emptyEl = document.getElementById('empty');
+  const inputEl = document.getElementById('input');
+  const sendBtn = document.getElementById('send');
+  const modelEl = document.getElementById('model');
+  const mainEl = document.getElementById('main');
+
+  function scrollBottom() { mainEl.scrollTop = mainEl.scrollHeight; }
+
+  function addBubble(role, text) {
+    const wrap = document.createElement('div');
+    wrap.className = 'msg ' + (role === 'user' ? 'me' : 'ai');
+    const avatar = document.createElement('div');
+    avatar.className = 'avatar';
+    avatar.textContent = role === 'user' ? '我' : 'AI';
+    const bubble = document.createElement('div');
+    bubble.className = 'bubble';
+    bubble.textContent = text;
+    wrap.appendChild(avatar);
+    wrap.appendChild(bubble);
+    listEl.appendChild(wrap);
+    emptyEl.style.display = 'none';
+    scrollBottom();
+    return wrap;
+  }
+
+  function addThinking() {
+    const wrap = addBubble('ai', '');
+    wrap.querySelector('.bubble').innerHTML = '<span class="thinking"><i></i><i></i><i></i></span>';
+    return wrap;
+  }
+
+  function autoGrow() {
+    inputEl.style.height = 'auto';
+    inputEl.style.height = Math.min(inputEl.scrollHeight, 160) + 'px';
+  }
+
+  async function loadInfo() {
+    try {
+      const res = await fetch('/api/info');
+      const data = await res.json();
+      modelEl.textContent = `模型：${data.model}（${data.provider}）`;
+    } catch (e) {
+      modelEl.textContent = '模型信息获取失败';
+    }
+  }
+
+  async function loadHistory() {
+    if (!sessionId) return;
+    try {
+      const res = await fetch('/api/sessions/' + sessionId);
+      if (!res.ok) return;
+      const data = await res.json();
+      (data.messages || []).forEach(m => {
+        if (m.role === 'user' || m.role === 'assistant') addBubble(m.role, m.content);
+      });
+    } catch (e) { /* 忽略历史加载失败 */ }
+  }
+
+  async function send() {
+    if (sending) return;
+    const text = inputEl.value.trim();
+    if (!text) return;
+
+    sending = true;
+    sendBtn.disabled = true;
+    addBubble('user', text);
+    inputEl.value = '';
+    autoGrow();
+    const thinking = addThinking();
+
+    try {
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: text, session_id: sessionId || undefined })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || '请求失败');
+      sessionId = data.session_id;
+      localStorage.setItem(KEY, sessionId);
+      thinking.querySelector('.bubble').textContent = data.reply || '（无回复）';
+    } catch (e) {
+      const bubble = thinking.querySelector('.bubble');
+      bubble.className = 'bubble error';
+      bubble.textContent = '出错：' + e.message;
+    } finally {
+      sending = false;
+      sendBtn.disabled = false;
+      scrollBottom();
+    }
+  }
+
+  async function clearSession() {
+    if (!sessionId) { listEl.innerHTML = ''; emptyEl.style.display = ''; return; }
+    if (!confirm('确定清空当前会话历史吗？')) return;
+    await fetch('/api/sessions/' + sessionId, { method: 'DELETE' });
+    sessionId = '';
+    localStorage.removeItem(KEY);
+    listEl.innerHTML = '';
+    emptyEl.style.display = '';
+  }
+
+  sendBtn.addEventListener('click', send);
+  document.getElementById('clear').addEventListener('click', clearSession);
+  inputEl.addEventListener('input', autoGrow);
+  inputEl.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
+  });
+
+  loadInfo();
+  loadHistory();
+  autoGrow();
+  inputEl.focus();
+</script>
+</body>
+</html>

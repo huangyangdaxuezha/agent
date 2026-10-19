@@ -5,15 +5,17 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "meeting-agent"
 version = "0.1.0"
-description = "会议小助手：最小可用的 Agent 骨架（CLI）"
+description = "会议小助手：最小可用的 Agent 骨架（CLI + Web）"
 requires-python = ">=3.10"
 dependencies = []
 
 [project.optional-dependencies]
-dev = ["pytest>=8.0"]
+dev = ["pytest>=8.0", "httpx>=0.27"]
+web = ["fastapi>=0.110", "uvicorn>=0.27"]
 
 [project.scripts]
 meeting-agent = "meeting_agent.cli:main"
+meeting-agent-web = "meeting_agent.api:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

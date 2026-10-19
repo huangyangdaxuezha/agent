@@ -59,6 +59,36 @@ python -m meeting_agent.cli
 
 REPL 命令：`/help` `/history` `/clear` `/save [路径]` `/exit`。
 
+## Web 页面版（推荐：给同事用）
+
+双击 **`run_web.cmd`**，会自动打开 <http://127.0.0.1:8000>。
+
+等价命令：
+
+```powershell
+$env:PYTHONPATH="src"
+.venv\Scripts\python.exe -X utf8 -m meeting_agent.api --host 127.0.0.1 --port 8000 --open
+```
+
+接口：
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| GET | `/` | 前端页面 |
+| POST | `/api/chat` | `{message, session_id?}` → `{session_id, reply}` |
+| GET | `/api/sessions/{id}` | 取历史消息 |
+| DELETE | `/api/sessions/{id}` | 清空会话 |
+| GET | `/api/info` | 当前模型信息（不返回密钥） |
+
+Web 与 CLI 共用同一个 `AgentLoop`，核心逻辑零改动，只是多了一个入口。
+
+注意事项：
+
+- **默认只监听本机**。要让局域网同事访问：`--host 0.0.0.0`，此时会议内容会经过内网传输，请先确认合规。
+- **会话隔离**：每个浏览器自动生成 `sessionId`（存 localStorage），历史落在 `.sessions/<session_id>.json`，多人不会串台。
+- **敏感操作**：Web 端无法同步等待人工点击，敏感工具默认一律拒绝（见 `api.deny_sensitive`）。
+- v1 仍是 JSON 文件存储并发量很小的场景；用户变多后换 SQLite。
+
 ## 配置
 
 复制 `.env.example` 为 `.env` 后填写：

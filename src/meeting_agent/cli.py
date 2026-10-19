@@ -6,11 +6,10 @@
 from __future__ import annotations
 
 import argparse
-from pathlib import Path
 
+from .bootstrap import create_llm, load_dotenv
 from .config import load_config
 from .core import DEFAULT_SYSTEM_PROMPT, AgentLoop
-from .llm import EchoLLM, OpenAICompatibleClient
 from .memory.short_term import ConversationMemory
 from .memory.store import JsonSessionStore
 from .observability.logger import get_logger, setup_logging
@@ -36,32 +35,6 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--session", help=f"会话文件路径，默认 {DEFAULT_SESSION_PATH}")
     parser.add_argument("--log-level", dest="log_level", help="日志级别：DEBUG/INFO/WARNING/ERROR")
     return parser
-
-
-def load_dotenv(path: str | Path = ".env") -> None:
-    """极简 .env 加载：只补充尚未设置的环境变量，避免覆盖真实环境。"""
-    import os
-
-    file = Path(path)
-    if not file.exists():
-        return
-    for line in file.read_text(encoding="utf-8").splitlines():
-        line = line.strip()
-        if not line or line.startswith("#") or "=" not in line:
-            continue
-        key, value = line.split("=", 1)
-        os.environ.setdefault(key.strip(), value.strip())
-
-
-def create_llm(config) -> EchoLLM | OpenAICompatibleClient:
-    if config.provider == "openai_compatible":
-        return OpenAICompatibleClient(
-            base_url=config.base_url,
-            api_key=config.api_key,
-            model=config.model,
-            temperature=config.temperature,
-        )
-    return EchoLLM(model=config.model)
 
 
 def confirm_sensitive(spec: ToolSpec, arguments: dict) -> bool:
