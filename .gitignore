@@ -4,6 +4,9 @@ venv/
 .venv/
 env/
 
+# 本地会话与密钥
+.sessions/
+
 # 构建产物
 dist/
 build/
