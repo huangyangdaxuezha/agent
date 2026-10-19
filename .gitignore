@@ -1,0 +1,35 @@
+# 依赖目录
+node_modules/
+venv/
+.venv/
+env/
+
+# 构建产物
+dist/
+build/
+out/
+*.log
+
+# 缓存
+__pycache__/
+*.py[cod]
+.cache/
+.pytest_cache/
+.mypy_cache/
+
+# 环境变量
+.env
+.env.local
+.env.*.local
+
+# 编辑器 / IDE
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.example.json
+.idea/
+*.swp
+
+# 系统文件
+.DS_Store
+Thumbs.db
+desktop.ini
