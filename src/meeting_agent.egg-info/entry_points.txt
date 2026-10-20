@@ -1,3 +1,0 @@
-[console_scripts]
-meeting-agent = meeting_agent.cli:main
-meeting-agent-web = meeting_agent.api:main
