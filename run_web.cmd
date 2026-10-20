@@ -21,6 +21,16 @@ if errorlevel 1 (
   )
 )
 
+rem If the port is already serving our app, just open the browser instead of failing.
+"%PY%" -c "import socket,sys;s=socket.socket();s.settimeout(1);sys.exit(0 if s.connect_ex(('127.0.0.1',8000))==0 else 1)"
+if not errorlevel 1 (
+  echo [INFO] The service is already running at http://127.0.0.1:8000
+  echo [INFO] Opening browser ...
+  start "" http://127.0.0.1:8000/
+  timeout /t 3 >nul
+  exit /b 0
+)
+
 echo [INFO] Starting at http://127.0.0.1:8000 ...
 "%PY%" -X utf8 -m meeting_agent.api --host 127.0.0.1 --port 8000 --open
 

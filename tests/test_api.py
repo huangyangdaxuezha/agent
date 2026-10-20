@@ -124,3 +124,37 @@ def test_deny_sensitive_returns_false():
     from meeting_agent.tools.registry import ToolSpec
 
     assert deny_sensitive(ToolSpec(name="x", sensitive=True), {}) is False
+
+
+def test_main_reuses_running_service_instead_of_crashing(monkeypatch):
+    """端口已被本服务占用时，应提示直接用，而不是抛一堆 traceback。"""
+    import uvicorn
+
+    from meeting_agent import api as api_module
+
+    def boom(*args, **kwargs):
+        raise OSError("[Errno 10048] error while attempting to bind on address")
+
+    monkeypatch.setattr(uvicorn, "run", boom)
+    monkeypatch.setattr(api_module, "create_app", lambda **kwargs: object())
+    monkeypatch.setattr(api_module, "load_dotenv", lambda: None)
+    monkeypatch.setattr(api_module, "port_already_serving", lambda host, port: True)
+
+    assert api_module.main(["--port", "8123"]) == 0
+
+
+def test_main_exits_when_port_taken_by_other_program(monkeypatch):
+    import uvicorn
+
+    from meeting_agent import api as api_module
+
+    def boom(*args, **kwargs):
+        raise OSError("bind failed")
+
+    monkeypatch.setattr(uvicorn, "run", boom)
+    monkeypatch.setattr(api_module, "create_app", lambda **kwargs: object())
+    monkeypatch.setattr(api_module, "load_dotenv", lambda: None)
+    monkeypatch.setattr(api_module, "port_already_serving", lambda host, port: False)
+
+    with pytest.raises(SystemExit):
+        api_module.main(["--port", "8123"])

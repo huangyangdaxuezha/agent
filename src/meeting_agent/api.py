@@ -231,6 +231,24 @@ def create_app(
     return app
 
 
+def port_already_serving(host: str, port: int, timeout: float = 1.5) -> bool:
+    """判断该端口上是否已经有「会议小助手」在跑（而不是被别的程序占着）。"""
+    import socket
+    import urllib.request
+
+    probe_host = "127.0.0.1" if host in ("", "0.0.0.0", "::") else host
+    with socket.socket() as sock:
+        sock.settimeout(timeout)
+        if sock.connect_ex((probe_host, port)) != 0:
+            return False
+    try:
+        url = f"http://{probe_host}:{port}/api/info"
+        with urllib.request.urlopen(url, timeout=timeout) as response:
+            return getattr(response, "status", 200) == 200
+    except OSError:
+        return False
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="meeting-agent-web", description="会议小助手 Web 服务")
     parser.add_argument("--host", default="127.0.0.1", help="监听地址，默认仅本机")
@@ -253,7 +271,18 @@ def main(argv: list[str] | None = None) -> int:
     logger.info("Web 服务启动：%s（数据库 %s）", url, config.db_path)
     import uvicorn
 
-    uvicorn.run(app, host=args.host, port=args.port)
+    try:
+        uvicorn.run(app, host=args.host, port=args.port)
+    except OSError as exc:
+        if port_already_serving(args.host, args.port):
+            print("")
+            print("[INFO] 端口 %s 上已经有正在运行的会议小助手，直接使用即可：" % args.port)
+            print("       %s" % url)
+            print("[TIP]  如需重启，请先关闭占用该端口的旧窗口，或改用 --port 换一个端口。")
+            if args.open_browser:
+                webbrowser.open(url)
+            return 0
+        raise SystemExit("[ERROR] 端口 %s 启动失败：%s" % (args.port, exc))
     return 0
 
 
