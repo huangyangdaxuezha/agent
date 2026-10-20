@@ -89,6 +89,34 @@ Web 与 CLI 共用同一个 `AgentLoop`，核心逻辑零改动，只是多了�
 - **敏感操作**：Web 端无法同步等待人工点击，敏感工具默认一律拒绝（见 `api.deny_sensitive`）。
 - v1 仍是 JSON 文件存储并发量很小的场景；用户变多后换 SQLite。
 
+## 会议纪要库（SQLite 持久化）
+
+数据落在 `.data/meeting.db`（SQLite，已 gitignore）。设计约定：
+
+- **会议原文不入库**：只用于生成纪要，用完即弃；
+- 纪要按**版本**保存，重新生成会产生新版本，旧版本可回滚；
+- 字段级修改（如改标题）记录 `change_log`，改错了可追溯；
+- `todos` 表为待办模块**预留**，当前不启用。
+
+两种用法：
+
+1. **页面操作**：纪要库页签 → 粘贴或导入 `.txt/.md` 原文 → 「生成并保存」→ 列表搜索/查看/编辑。
+2. **对话指令**（模型自动调工具）：直接在对话框里说——
+   - 「查一下 10 月 20 日的会议纪要」（`list_meetings` / `get_meeting_minutes`）
+   - 「把那场会的标题改成 XX」（`update_meeting`，只改指定字段，不弹确认）
+
+接口（供后续桌面端/机器人复用）：
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| POST | `/api/meetings/generate` | `{raw_text, title?, meeting_date?}` → 生成并入库 |
+| GET | `/api/meetings` | 列表，支持 `keyword` / `meeting_date` 过滤 |
+| GET | `/api/meetings/{id}` | 详情（当前版本纪要） |
+| PATCH | `/api/meetings/{id}` | 字段级修改（title / content / summary / meeting_date） |
+| GET | `/api/meetings/{id}/changes` | 修改记录（审计） |
+
+模型输出非法 JSON 时自动重试一次，仍失败则**原文降级保存**并标记“未结构化”，不丢用户输入。
+
 ## 配置
 
 复制 `.env.example` 为 `.env` 后填写：

@@ -19,6 +19,13 @@ DEFAULT_SYSTEM_PROMPT = (
 )
 
 
+TOOL_USAGE_HINT = (
+    "\n你可以使用会议纪要工具：先用 list_meetings 或 get_meeting_minutes 查到具体会议，"
+    "再用 update_meeting 只修改用户要求改的字段（未提供的字段保持原值）。"
+    "回答必须基于工具返回的内容，查不到就直说查不到，不要编造。"
+)
+
+
 def build_messages(
     system_prompt: str,
     history: Sequence[Message],

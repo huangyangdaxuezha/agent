@@ -6,119 +6,174 @@
 <title>会议小助手</title>
 <style>
   :root {
-    --bg: #f4f6fb;
-    --card: #ffffff;
-    --brand: #4f46e5;
-    --brand-2: #6366f1;
-    --text: #1f2430;
-    --muted: #6b7280;
-    --line: #e6e8ef;
+    --bg: #f4f6fb; --card: #fff; --brand: #4f46e5; --brand-2: #6366f1;
+    --text: #1f2430; --muted: #6b7280; --line: #e6e8ef;
   }
   * { box-sizing: border-box; }
-  body {
-    margin: 0; height: 100vh; display: flex; flex-direction: column;
-    background: var(--bg); color: var(--text);
-    font-family: "Microsoft YaHei", "PingFang SC", system-ui, -apple-system, Segoe UI, sans-serif;
-  }
-  header {
-    background: linear-gradient(120deg, var(--brand), var(--brand-2));
-    color: #fff; padding: 14px 20px; display: flex; align-items: center; gap: 12px;
-    box-shadow: 0 2px 12px rgba(79, 70, 229, .25);
-  }
-  header h1 { font-size: 17px; margin: 0; font-weight: 600; letter-spacing: .5px; }
-  header .model {
-    font-size: 12px; background: rgba(255,255,255,.18); padding: 3px 10px;
-    border-radius: 999px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 45vw;
-  }
-  header .spacer { flex: 1; }
-  header button {
-    background: rgba(255,255,255,.16); border: 1px solid rgba(255,255,255,.35); color: #fff;
-    padding: 6px 14px; border-radius: 8px; cursor: pointer; font-size: 13px;
-  }
-  header button:hover { background: rgba(255,255,255,.28); }
+  body { margin: 0; height: 100vh; display: flex; flex-direction: column; background: var(--bg);
+    color: var(--text); font-family: "Microsoft YaHei","PingFang SC",system-ui,-apple-system,Segoe UI,sans-serif; }
+  header { background: linear-gradient(120deg,var(--brand),var(--brand-2)); color:#fff; padding: 12px 20px;
+    display:flex; align-items:center; gap:14px; box-shadow: 0 2px 12px rgba(79,70,229,.25); }
+  header h1 { font-size:17px; margin:0; font-weight:600; }
+  .tabs { display:flex; gap:6px; background: rgba(255,255,255,.16); padding:3px; border-radius:10px; }
+  .tabs button { background:transparent; border:none; color:#fff; padding:6px 14px; border-radius:8px;
+    cursor:pointer; font-size:13px; }
+  .tabs button.active { background:#fff; color:var(--brand); font-weight:600; }
+  header .model { font-size:12px; background: rgba(255,255,255,.18); padding:3px 10px; border-radius:999px; }
+  header .spacer { flex:1; }
 
-  main { flex: 1; overflow-y: auto; padding: 22px 16px; }
-  .wrap { max-width: 860px; margin: 0 auto; }
-  .msg { display: flex; margin-bottom: 16px; gap: 10px; align-items: flex-start; }
-  .msg.me { flex-direction: row-reverse; }
-  .avatar {
-    width: 32px; height: 32px; border-radius: 10px; flex: 0 0 32px;
-    display: flex; align-items: center; justify-content: center; font-size: 13px; color: #fff;
-  }
+  #chat { flex:1; display:flex; flex-direction:column; min-height:0; }
+  main { flex:1; overflow-y:auto; padding:22px 16px; }
+  .wrap { max-width:860px; margin:0 auto; }
+  .msg { display:flex; margin-bottom:16px; gap:10px; align-items:flex-start; }
+  .msg.me { flex-direction:row-reverse; }
+  .avatar { width:32px; height:32px; border-radius:10px; flex:0 0 32px; display:flex; align-items:center;
+    justify-content:center; font-size:13px; color:#fff; }
   .msg.me .avatar { background: var(--brand); }
-  .msg.ai .avatar { background: #10b981; }
-  .bubble {
-    max-width: 74%; padding: 11px 14px; border-radius: 14px; line-height: 1.7;
-    font-size: 14px; white-space: pre-wrap; word-break: break-word;
-  }
-  .msg.me .bubble { background: var(--brand); color: #fff; border-top-right-radius: 4px; }
-  .msg.ai .bubble { background: var(--card); border: 1px solid var(--line); border-top-left-radius: 4px; }
+  .msg.ai .avatar { background:#10b981; }
+  .bubble { max-width:74%; padding:11px 14px; border-radius:14px; line-height:1.7; font-size:14px;
+    white-space:pre-wrap; word-break:break-word; }
+  .msg.me .bubble { background:var(--brand); color:#fff; border-top-right-radius:4px; }
+  .msg.ai .bubble { background:var(--card); border:1px solid var(--line); border-top-left-radius:4px; }
+  .empty { text-align:center; color:var(--muted); margin-top:10vh; }
+  .empty h2 { font-size:20px; color:var(--text); margin-bottom:8px; }
+  .empty ul { display:inline-block; text-align:left; font-size:13px; line-height:2; }
+  footer { border-top:1px solid var(--line); background:var(--card); padding:14px 16px; }
+  .input-row { max-width:860px; margin:0 auto; display:flex; gap:10px; align-items:flex-end; }
+  textarea { flex:1; resize:none; border:1px solid var(--line); border-radius:12px; padding:11px 13px;
+    font:inherit; font-size:14px; line-height:1.6; max-height:160px; outline:none; background:#fbfcfe; }
+  textarea:focus { border-color:var(--brand); background:#fff; }
+  .btn { background:var(--brand); color:#fff; border:none; border-radius:12px; padding:11px 22px;
+    font-size:14px; cursor:pointer; height:44px; }
+  .btn:disabled { background:#c7cbd8; cursor:not-allowed; }
+  .btn.ghost { background:#fff; color:var(--brand); border:1px solid var(--brand); height:34px; padding:6px 14px; border-radius:9px; }
+  .tip { max-width:860px; margin:8px auto 0; font-size:12px; color:var(--muted); }
+  .thinking i { width:6px; height:6px; border-radius:50%; background:var(--muted); display:inline-block;
+    animation: blink 1s infinite; margin-right:3px; }
+  @keyframes blink { 0%,80%,100%{opacity:.25} 40%{opacity:1} }
+  .error { color:#dc2626; font-size:13px; }
 
-  .empty { text-align: center; color: var(--muted); margin-top: 12vh; }
-  .empty h2 { font-size: 20px; margin-bottom: 8px; color: var(--text); }
-  .empty ul { display: inline-block; text-align: left; color: var(--muted); font-size: 13px; line-height: 2; }
-
-  footer { border-top: 1px solid var(--line); background: var(--card); padding: 14px 16px; }
-  .input-row { max-width: 860px; margin: 0 auto; display: flex; gap: 10px; align-items: flex-end; }
-  textarea {
-    flex: 1; resize: none; border: 1px solid var(--line); border-radius: 12px; padding: 11px 13px;
-    font: inherit; font-size: 14px; line-height: 1.6; max-height: 160px; outline: none; background: #fbfcfe;
-  }
-  textarea:focus { border-color: var(--brand); background: #fff; }
-  .send {
-    background: var(--brand); color: #fff; border: none; border-radius: 12px; padding: 11px 22px;
-    font-size: 14px; cursor: pointer; height: 44px;
-  }
-  .send:disabled { background: #c7cbd8; cursor: not-allowed; }
-  .tip { max-width: 860px; margin: 8px auto 0; font-size: 12px; color: var(--muted); }
-  .thinking { display: inline-flex; gap: 4px; align-items: center; }
-  .thinking i { width: 6px; height: 6px; border-radius: 50%; background: var(--muted); animation: blink 1s infinite; }
-  .thinking i:nth-child(2) { animation-delay: .2s; }
-  .thinking i:nth-child(3) { animation-delay: .4s; }
-  @keyframes blink { 0%,80%,100% { opacity: .25 } 40% { opacity: 1 } }
-  .error { color: #dc2626; font-size: 13px; }
+  #library { flex:1; display:flex; min-height:0; padding:16px; gap:16px; }
+  .panel { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:14px;
+    display:flex; flex-direction:column; min-height:0; }
+  .left { width:340px; flex:0 0 340px; }
+  .right { flex:1; }
+  .panel h3 { margin:0 0 10px; font-size:14px; }
+  .lib-textarea { width:100%; height:120px; border:1px solid var(--line); border-radius:10px; padding:10px;
+    font:inherit; font-size:13px; resize:vertical; background:#fbfcfe; }
+  .row { display:flex; gap:8px; align-items:center; margin-top:10px; }
+  .search { flex:1; border:1px solid var(--line); border-radius:9px; padding:8px 10px; font:inherit; font-size:13px; }
+  .list { margin-top:10px; overflow-y:auto; flex:1; }
+  .item { padding:10px; border:1px solid var(--line); border-radius:10px; margin-bottom:8px; cursor:pointer; }
+  .item:hover { border-color:var(--brand); }
+  .item.active { border-color:var(--brand); background:#f5f3ff; }
+  .item .t { font-size:13px; font-weight:600; margin-bottom:4px; }
+  .item .m { font-size:12px; color:var(--muted); }
+  .detail-title { width:100%; border:1px solid var(--line); border-radius:9px; padding:9px 11px; font:inherit;
+    font-size:15px; font-weight:600; }
+  .detail-body { flex:1; width:100%; border:1px solid var(--line); border-radius:10px; padding:12px;
+    font:inherit; font-size:13px; line-height:1.8; resize:none; margin-top:10px; background:#fbfcfe; }
+  .meta { font-size:12px; color:var(--muted); margin-top:8px; }
+  .hidden { display:none !important; }
+  @media (max-width: 860px) { #library { flex-direction:column; } .left { width:auto; flex:0 0 auto; } }
 </style>
 </head>
 <body>
 <header>
   <h1>会议小助手</h1>
+  <div class="tabs">
+    <button id="tab-chat" class="active">对话</button>
+    <button id="tab-lib">纪要库</button>
+  </div>
   <span class="model" id="model">加载中…</span>
   <span class="spacer"></span>
-  <button id="clear">清空会话</button>
 </header>
 
-<main id="main">
-  <div class="wrap" id="list"></div>
-  <div class="empty" id="empty">
-    <h2>把会议内容交给我</h2>
-    <ul>
-      <li>整理会议纪要、结论与分歧点</li>
-      <li>抽取待办事项（负责人 / 截止时间）</li>
-      <li>基于会议记录回答具体问题</li>
-    </ul>
-  </div>
-</main>
+<!-- 对话视图 -->
+<section id="chat">
+  <main id="main">
+    <div class="wrap" id="list"></div>
+    <div class="empty" id="empty">
+      <h2>把会议内容交给我</h2>
+      <ul>
+        <li>整理会议纪要、结论与分歧点</li>
+        <li>抽取待办事项（负责人 / 截止时间）</li>
+        <li>按日期或关键词查找历史会议纪要</li>
+        <li>直接下指令改纪要，例如「把 10 月 20 日那场的标题改成 XX」</li>
+      </ul>
+    </div>
+  </main>
+  <footer>
+    <div class="input-row">
+      <textarea id="input" rows="1" placeholder="问问题、查纪要、下修改指令…"></textarea>
+      <button class="btn" id="send">发送</button>
+    </div>
+    <div class="tip">Enter 发送，Shift + Enter 换行</div>
+  </footer>
+</section>
 
-<footer>
-  <div class="input-row">
-    <textarea id="input" rows="1" placeholder="粘贴会议记录或输入问题…"></textarea>
-    <button class="send" id="send">发送</button>
+<!-- 纪要库视图 -->
+<section id="library" class="hidden">
+  <div class="panel left">
+    <h3>导入会议原文</h3>
+    <textarea id="raw" class="lib-textarea" placeholder="粘贴会议记录，或从下方导入 txt / md 文件…"></textarea>
+    <div class="row">
+      <input type="file" id="file" accept=".txt,.md,.markdown,.text" />
+      <button class="btn ghost" id="gen">生成并保存</button>
+    </div>
+    <div class="row">
+      <input class="search" id="kw" placeholder="搜索标题 / 内容关键词" />
+      <button class="btn ghost" id="search">搜索</button>
+      <button class="btn ghost" id="refresh">刷新</button>
+    </div>
+    <div class="list" id="meetings"></div>
   </div>
-  <div class="tip">Enter 发送，Shift + Enter 换行</div>
-</footer>
+  <div class="panel right">
+    <h3>纪要详情</h3>
+    <input class="detail-title" id="d-title" placeholder="会议标题" />
+    <div class="row">
+      <input class="search" id="d-date" placeholder="会议日期，如 2026-10-20" style="max-width:220px" />
+      <button class="btn ghost" id="save">保存修改</button>
+      <span class="meta" id="d-meta"></span>
+    </div>
+    <textarea class="detail-body" id="d-content" placeholder="纪要正文"></textarea>
+  </div>
+</section>
 
 <script>
   const KEY = 'meeting_agent_session';
   let sessionId = localStorage.getItem(KEY) || '';
   let sending = false;
+  let currentId = null;
 
   const listEl = document.getElementById('list');
   const emptyEl = document.getElementById('empty');
   const inputEl = document.getElementById('input');
   const sendBtn = document.getElementById('send');
-  const modelEl = document.getElementById('model');
   const mainEl = document.getElementById('main');
+  const meetingsEl = document.getElementById('meetings');
 
+  const api = {
+    async json(url, options) {
+      const res = await fetch(url, options);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || '请求失败');
+      return data;
+    }
+  };
+
+  /* ---------- 视图切换 ---------- */
+  function switchTab(name) {
+    document.getElementById('chat').classList.toggle('hidden', name !== 'chat');
+    document.getElementById('library').classList.toggle('hidden', name !== 'lib');
+    document.getElementById('tab-chat').classList.toggle('active', name === 'chat');
+    document.getElementById('tab-lib').classList.toggle('active', name === 'lib');
+    if (name === 'lib') loadMeetings();
+  }
+  document.getElementById('tab-chat').onclick = () => switchTab('chat');
+  document.getElementById('tab-lib').onclick = () => switchTab('lib');
+
+  /* ---------- 对话 ---------- */
   function scrollBottom() { mainEl.scrollTop = mainEl.scrollHeight; }
 
   function addBubble(role, text) {
@@ -130,102 +185,150 @@
     const bubble = document.createElement('div');
     bubble.className = 'bubble';
     bubble.textContent = text;
-    wrap.appendChild(avatar);
-    wrap.appendChild(bubble);
+    wrap.appendChild(avatar); wrap.appendChild(bubble);
     listEl.appendChild(wrap);
     emptyEl.style.display = 'none';
     scrollBottom();
     return wrap;
   }
 
-  function addThinking() {
-    const wrap = addBubble('ai', '');
-    wrap.querySelector('.bubble').innerHTML = '<span class="thinking"><i></i><i></i><i></i></span>';
-    return wrap;
-  }
-
-  function autoGrow() {
-    inputEl.style.height = 'auto';
-    inputEl.style.height = Math.min(inputEl.scrollHeight, 160) + 'px';
-  }
-
-  async function loadInfo() {
+  async function send() {
+    if (sending) return;
+    const text = inputEl.value.trim();
+    if (!text) return;
+    sending = true; sendBtn.disabled = true;
+    addBubble('user', text);
+    inputEl.value = ''; inputEl.style.height = 'auto';
+    const thinking = addBubble('ai', '');
+    thinking.querySelector('.bubble').innerHTML = '<span class="thinking"><i></i><i></i><i></i></span>';
     try {
-      const res = await fetch('/api/info');
-      const data = await res.json();
-      modelEl.textContent = `模型：${data.model}（${data.provider}）`;
+      const data = await api.json('/api/chat', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: text, session_id: sessionId || undefined })
+      });
+      sessionId = data.session_id;
+      localStorage.setItem(KEY, sessionId);
+      thinking.querySelector('.bubble').textContent = data.reply || '（无回复）';
+      loadMeetings();
     } catch (e) {
-      modelEl.textContent = '模型信息获取失败';
+      const b = thinking.querySelector('.bubble');
+      b.className = 'bubble error';
+      b.textContent = '出错：' + e.message;
+    } finally {
+      sending = false; sendBtn.disabled = false; scrollBottom();
     }
   }
 
   async function loadHistory() {
     if (!sessionId) return;
     try {
-      const res = await fetch('/api/sessions/' + sessionId);
-      if (!res.ok) return;
-      const data = await res.json();
+      const data = await api.json('/api/sessions/' + sessionId);
       (data.messages || []).forEach(m => {
         if (m.role === 'user' || m.role === 'assistant') addBubble(m.role, m.content);
       });
-    } catch (e) { /* 忽略历史加载失败 */ }
+    } catch (e) { /* 忽略 */ }
   }
 
-  async function send() {
-    if (sending) return;
-    const text = inputEl.value.trim();
-    if (!text) return;
-
-    sending = true;
-    sendBtn.disabled = true;
-    addBubble('user', text);
-    inputEl.value = '';
-    autoGrow();
-    const thinking = addThinking();
-
+  /* ---------- 纪要库 ---------- */
+  async function loadMeetings(keyword) {
     try {
-      const res = await fetch('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: text, session_id: sessionId || undefined })
+      const data = await api.json('/api/meetings?limit=50&keyword=' + encodeURIComponent(keyword || ''));
+      meetingsEl.innerHTML = '';
+      if (!data.count) { meetingsEl.innerHTML = '<div class="meta">暂无纪要</div>'; return; }
+      data.meetings.forEach(m => {
+        const item = document.createElement('div');
+        item.className = 'item' + (m.id === currentId ? ' active' : '');
+        const t = document.createElement('div'); t.className = 't'; t.textContent = m.title || '（无标题）';
+        const meta = document.createElement('div'); meta.className = 'm';
+        meta.textContent = [m.meeting_date, 'v' + (m.version ?? 1), (m.updated_at || '').slice(0, 16)].filter(Boolean).join(' · ');
+        item.appendChild(t); item.appendChild(meta);
+        item.onclick = () => openMeeting(m.id);
+        meetingsEl.appendChild(item);
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.detail || '请求失败');
-      sessionId = data.session_id;
-      localStorage.setItem(KEY, sessionId);
-      thinking.querySelector('.bubble').textContent = data.reply || '（无回复）';
+    } catch (e) { meetingsEl.innerHTML = '<div class="meta">加载失败</div>'; }
+  }
+
+  async function openMeeting(id) {
+    const data = await api.json('/api/meetings/' + id);
+    currentId = id;
+    document.getElementById('d-title').value = data.title || '';
+    document.getElementById('d-date').value = data.meeting_date || '';
+    document.getElementById('d-content').value = data.content || '';
+    document.getElementById('d-meta').textContent =
+      `版本 ${data.version ?? 1} · 更新于 ${(data.updated_at || '').slice(0, 16)}` +
+      (data.todos && data.todos.length ? ` · 待办 ${data.todos.length} 项` : '');
+    loadMeetings(document.getElementById('kw').value);
+  }
+
+  async function generate() {
+    const raw = document.getElementById('raw').value.trim();
+    if (!raw) { alert('请先粘贴或导入会议原文'); return; }
+    const btn = document.getElementById('gen');
+    btn.disabled = true; btn.textContent = '生成中…';
+    try {
+      const data = await api.json('/api/meetings/generate', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ raw_text: raw })
+      });
+      document.getElementById('raw').value = '';
+      await loadMeetings();
+      await openMeeting(data.id);
+      if (!data.structured) alert('已保存，但模型输出不是标准格式，已按原文保存：' + (data.note || ''));
     } catch (e) {
-      const bubble = thinking.querySelector('.bubble');
-      bubble.className = 'bubble error';
-      bubble.textContent = '出错：' + e.message;
+      alert('生成失败：' + e.message);
     } finally {
-      sending = false;
-      sendBtn.disabled = false;
-      scrollBottom();
+      btn.disabled = false; btn.textContent = '生成并保存';
     }
   }
 
-  async function clearSession() {
-    if (!sessionId) { listEl.innerHTML = ''; emptyEl.style.display = ''; return; }
-    if (!confirm('确定清空当前会话历史吗？')) return;
-    await fetch('/api/sessions/' + sessionId, { method: 'DELETE' });
-    sessionId = '';
-    localStorage.removeItem(KEY);
-    listEl.innerHTML = '';
-    emptyEl.style.display = '';
+  async function saveDetail() {
+    if (!currentId) { alert('请先选择一条纪要'); return; }
+    try {
+      const data = await api.json('/api/meetings/' + currentId, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: document.getElementById('d-title').value,
+          meeting_date: document.getElementById('d-date').value,
+          content: document.getElementById('d-content').value
+        })
+      });
+      document.getElementById('d-meta').textContent = `已保存 · 版本 ${data.version ?? 1}`;
+      await loadMeetings(document.getElementById('kw').value);
+    } catch (e) { alert('保存失败：' + e.message); }
   }
 
-  sendBtn.addEventListener('click', send);
-  document.getElementById('clear').addEventListener('click', clearSession);
-  inputEl.addEventListener('input', autoGrow);
+  document.getElementById('file').onchange = e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => { document.getElementById('raw').value = String(reader.result || ''); };
+    reader.readAsText(file, 'utf-8');
+  };
+
+  sendBtn.onclick = send;
+  document.getElementById('gen').onclick = generate;
+  document.getElementById('save').onclick = saveDetail;
+  document.getElementById('refresh').onclick = () => loadMeetings(document.getElementById('kw').value);
+  document.getElementById('search').onclick = () => loadMeetings(document.getElementById('kw').value);
+  document.getElementById('kw').addEventListener('keydown', e => {
+    if (e.key === 'Enter') loadMeetings(e.target.value);
+  });
+  inputEl.addEventListener('input', () => {
+    inputEl.style.height = 'auto';
+    inputEl.style.height = Math.min(inputEl.scrollHeight, 160) + 'px';
+  });
   inputEl.addEventListener('keydown', e => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
   });
 
-  loadInfo();
-  loadHistory();
-  autoGrow();
-  inputEl.focus();
+  (async function init() {
+    try {
+      const info = await api.json('/api/info');
+      document.getElementById('model').textContent = `模型：${info.model}（${info.provider}）`;
+    } catch (e) { document.getElementById('model').textContent = '模型信息获取失败'; }
+    loadHistory();
+    inputEl.focus();
+  })();
 </script>
 </body>
 </html>

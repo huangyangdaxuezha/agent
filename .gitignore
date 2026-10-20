@@ -7,6 +7,9 @@ env/
 # 本地会话与密钥
 .sessions/
 
+# 本地数据库（SQLite）
+.data/
+
 # 构建产物
 dist/
 build/

@@ -8,6 +8,7 @@ from fastapi.testclient import TestClient  # noqa: E402
 from meeting_agent.api import create_app, deny_sensitive  # noqa: E402
 from meeting_agent.config import Config  # noqa: E402
 from meeting_agent.core.types import LLMResponse  # noqa: E402
+from meeting_agent.memory.repository import SQLiteRepository  # noqa: E402
 from meeting_agent.tools.registry import ToolRegistry  # noqa: E402
 
 from .fakes import FakeLLM, tool_call  # noqa: E402
@@ -18,7 +19,8 @@ def build_client(tmp_path, llm=None, tools=None):
         config=Config(provider="echo", api_key="secret-should-not-leak"),
         llm=llm or FakeLLM([LLMResponse(content="会议纪要如下")]),
         tools=tools or ToolRegistry(),
-        session_dir=tmp_path,
+        session_dir=tmp_path / "sessions",
+        repository=SQLiteRepository(tmp_path / "db.sqlite"),
     )
     return TestClient(app)
 

@@ -22,6 +22,7 @@ class Config:
     max_steps: int = 5
     max_history: int = 40
     log_level: str = "INFO"
+    db_path: str = ".data/meeting.db"
 
     def with_overrides(self, **overrides: object) -> "Config":
         """返回只覆盖非 None 字段的新配置，保持原配置不可变。"""
@@ -62,5 +63,6 @@ def load_config(env: Mapping[str, str] | None = None, **overrides: object) -> Co
         max_steps=max(1, int(_read_number(source, "MAX_STEPS", 5))),
         max_history=int(_read_number(source, "MAX_HISTORY", 40)),
         log_level=_read_str(source, "LOG_LEVEL", "INFO"),
+        db_path=_read_str(source, "DB_PATH", ".data/meeting.db"),
     )
     return config.with_overrides(**overrides)

@@ -1,3 +1,0 @@
-v1 不内置任何执行类工具。
-后续在此目录添加工具（如 read_file / run_command），
-有副作用的工具必须设置 sensitive=True，由 CLI 的人工确认回调把关。
