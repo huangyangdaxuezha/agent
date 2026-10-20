@@ -96,7 +96,10 @@ Web 与 CLI 共用同一个 `AgentLoop`，核心逻辑零改动，只是多了�
 - **会议原文不入库**：只用于生成纪要，用完即弃；
 - 纪要按**版本**保存，重新生成会产生新版本，旧版本可回滚；
 - 字段级修改（如改标题）记录 `change_log`，改错了可追溯；
-- `todos` 表为待办模块**预留**，当前不启用。
+- **纪要与待办分表**：`minutes` 只存纪要正文，待办存独立 `todos` 表。
+  查纪要不会带出待办数据，待办可以独立演进而不动纪要表结构。
+  重新生成纪要时该会议的待办整体覆盖，不会越堆越多。
+  旧库（待办曾以 JSON 存在 `minutes.todos`）启动时自动迁移到 `todos` 表。
 
 两种用法：
 
@@ -104,6 +107,7 @@ Web 与 CLI 共用同一个 `AgentLoop`，核心逻辑零改动，只是多了�
 2. **对话指令**（模型自动调工具）：直接在对话框里说——
    - 「查一下 10 月 20 日的会议纪要」（`list_meetings` / `get_meeting_minutes`）
    - 「把那场会的标题改成 XX」（`update_meeting`，只改指定字段，不弹确认）
+   - 「最近有哪些待办」（`list_todos`，待办与纪要分开查）
 
 接口（供后续桌面端/机器人复用）：
 
@@ -111,9 +115,10 @@ Web 与 CLI 共用同一个 `AgentLoop`，核心逻辑零改动，只是多了�
 |---|---|---|
 | POST | `/api/meetings/generate` | `{raw_text, title?, meeting_date?}` → 生成并入库 |
 | GET | `/api/meetings` | 列表，支持 `keyword` / `meeting_date` 过滤 |
-| GET | `/api/meetings/{id}` | 详情（当前版本纪要） |
+| GET | `/api/meetings/{id}` | 详情（当前版本纪要，**不含待办**） |
 | PATCH | `/api/meetings/{id}` | 字段级修改（title / content / summary / meeting_date） |
 | GET | `/api/meetings/{id}/changes` | 修改记录（审计） |
+| GET | `/api/todos` | 待办列表，支持 `meeting_id` / `status` / `limit` 过滤 |
 
 模型输出非法 JSON 时自动重试一次，仍失败则**原文降级保存**并标记“未结构化”，不丢用户输入。
 

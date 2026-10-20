@@ -255,8 +255,7 @@
     document.getElementById('d-date').value = data.meeting_date || '';
     document.getElementById('d-content').value = data.content || '';
     document.getElementById('d-meta').textContent =
-      `版本 ${data.version ?? 1} · 更新于 ${(data.updated_at || '').slice(0, 16)}` +
-      (data.todos && data.todos.length ? ` · 待办 ${data.todos.length} 项` : '');
+      `版本 ${data.version ?? 1} · 更新于 ${(data.updated_at || '').slice(0, 16)}`;
     loadMeetings(document.getElementById('kw').value);
   }
 

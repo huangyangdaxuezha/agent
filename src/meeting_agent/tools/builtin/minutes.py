@@ -56,7 +56,7 @@ def register_minutes_tools(
 
     @registry.register(
         name="get_meeting_minutes",
-        description="按 id 获取某场会议的完整纪要（标题、日期、摘要、正文、待办）",
+        description="按 id 获取某场会议的纪要（标题、日期、摘要、正文）；不含待办，待办用 list_todos 查",
         parameters=_schema({"meeting_id": {"type": "integer"}}, ["meeting_id"]),
     )
     def get_meeting_minutes(meeting_id: int) -> str:
@@ -70,10 +70,28 @@ def register_minutes_tools(
                 "meeting_date": record["meeting_date"],
                 "summary": record.get("summary") or "",
                 "content": record.get("content") or "",
-                "todos": record.get("todos") or [],
                 "version": record.get("version"),
             }
         )
+
+    @registry.register(
+        name="list_todos",
+        description="查询待办事项（与纪要分开存储），可按会议 id 或状态过滤；不传 meeting_id 表示查全部",
+        parameters=_schema(
+            {
+                "meeting_id": {"type": "integer", "description": "会议 id，0 表示不限"},
+                "status": {"type": "string", "description": "状态，如 open / done，空则不过滤"},
+                "limit": {"type": "integer", "description": "返回条数，默认 20"},
+            }
+        ),
+    )
+    def list_todos(meeting_id: int = 0, status: str = "", limit: int = 20) -> str:
+        rows = repository.list_todos(
+            meeting_id=int(meeting_id) or None,
+            status=status,
+            limit=max(1, min(int(limit), 100)),
+        )
+        return _dump({"count": len(rows), "todos": rows})
 
     @registry.register(
         name="update_meeting",

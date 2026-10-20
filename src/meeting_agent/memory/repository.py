@@ -1,10 +1,12 @@
-"""SQLite 仓储：会议纪要的长期持久化（demo 规模：本机单文件）。
+"""SQLite 仓储：会议纪要与待办的长期持久化（demo 规模：本机单文件）。
 
 设计约定：
 - 会议原文**不入库**（用完即弃），只持久化生成的纪要与元信息；
 - 纪要按版本保存，最新一版 is_current=1，可回滚；
 - 字段级修改走 patch_meeting，并把改动写进 change_log（改错了能查到）；
-- todos 表为待办模块**预留**，当前不启用；
+- **纪要与待办分表**：minutes 只存纪要正文，待办存独立 todos 表，
+  因此查纪要时不会带出任何待办数据；待办模块可以独立演进，不动纪要表结构；
+- 旧库（todos 曾以 JSON 存在 minutes.todos 里）会自动迁移到 todos 表；
 - 所有 SQL 只出现在本文件，将来换 Postgres/MySQL 时只改这里。
 """
 
@@ -18,6 +20,21 @@ from typing import Any
 
 DEFAULT_DB_PATH = ".data/meeting.db"
 
+MINUTES_TABLE_SQL = """
+    CREATE TABLE IF NOT EXISTS minutes (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        meeting_id INTEGER NOT NULL REFERENCES meetings(id) ON DELETE CASCADE,
+        version INTEGER NOT NULL DEFAULT 1,
+        summary TEXT NOT NULL DEFAULT '',
+        content TEXT NOT NULL,
+        model TEXT NOT NULL DEFAULT '',
+        is_current INTEGER NOT NULL DEFAULT 1,
+        created_at TEXT NOT NULL
+    )
+    """
+
+MINUTES_INDEX_SQL = "CREATE INDEX IF NOT EXISTS idx_minutes_meeting ON minutes(meeting_id, is_current)"
+
 SCHEMA_STATEMENTS = (
     """
     CREATE TABLE IF NOT EXISTS meetings (
@@ -29,20 +46,8 @@ SCHEMA_STATEMENTS = (
         updated_at TEXT NOT NULL
     )
     """,
-    """
-    CREATE TABLE IF NOT EXISTS minutes (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        meeting_id INTEGER NOT NULL REFERENCES meetings(id) ON DELETE CASCADE,
-        version INTEGER NOT NULL DEFAULT 1,
-        summary TEXT NOT NULL DEFAULT '',
-        content TEXT NOT NULL,
-        todos TEXT NOT NULL DEFAULT '[]',
-        model TEXT NOT NULL DEFAULT '',
-        is_current INTEGER NOT NULL DEFAULT 1,
-        created_at TEXT NOT NULL
-    )
-    """,
-    # 待办模块预留表：当前阶段不写入，等后续独立做待办时直接启用
+    MINUTES_TABLE_SQL,
+    # 待办独立表：与纪要分开存，查纪要不会读到待办
     """
     CREATE TABLE IF NOT EXISTS todos (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -64,7 +69,8 @@ SCHEMA_STATEMENTS = (
         created_at TEXT NOT NULL
     )
     """,
-    "CREATE INDEX IF NOT EXISTS idx_minutes_meeting ON minutes(meeting_id, is_current)",
+    MINUTES_INDEX_SQL,
+    "CREATE INDEX IF NOT EXISTS idx_todos_meeting ON todos(meeting_id)",
 )
 
 
@@ -96,6 +102,58 @@ class SQLiteRepository:
         with self._connect() as conn:
             for statement in SCHEMA_STATEMENTS:
                 conn.execute(statement)
+            self._migrate_split_todos(conn)
+
+    @staticmethod
+    def _migrate_split_todos(conn: sqlite3.Connection) -> None:
+        """旧库把待办以 JSON 存在 minutes.todos，这里搬到独立表并去掉该列。
+
+        只跑一次：迁移后 minutes 表不再有 todos 列，下次启动直接跳过。
+        """
+        columns = {row[1] for row in conn.execute("PRAGMA table_info(minutes)")}
+        if "todos" not in columns:
+            return
+
+        rows = conn.execute("SELECT meeting_id, todos, created_at FROM minutes").fetchall()
+        for meeting_id, payload, created_at in rows:
+            try:
+                items = json.loads(payload or "[]")
+            except (json.JSONDecodeError, TypeError):
+                continue
+            if not isinstance(items, list):
+                continue
+            for item in items:
+                if isinstance(item, str):
+                    item = {"content": item}
+                if not isinstance(item, dict):
+                    continue
+                content = str(item.get("content", "")).strip()
+                if not content:
+                    continue
+                conn.execute(
+                    "INSERT INTO todos (meeting_id, content, owner, due_date, status, created_at)"
+                    " VALUES (?, ?, ?, ?, 'open', ?)",
+                    (
+                        meeting_id,
+                        content,
+                        str(item.get("owner", "")).strip(),
+                        str(item.get("due_date", "")).strip(),
+                        created_at or timestamp(),
+                    ),
+                )
+
+        # SQLite 的 DROP COLUMN 对旧版本不可用，统一用「重建表」的方式去掉列
+        conn.execute("DROP INDEX IF EXISTS idx_minutes_meeting")
+        conn.execute("ALTER TABLE minutes RENAME TO minutes_legacy")
+        conn.execute(MINUTES_TABLE_SQL)
+        conn.execute(
+            "INSERT INTO minutes (id, meeting_id, version, summary, content, model,"
+            " is_current, created_at)"
+            " SELECT id, meeting_id, version, summary, content, model, is_current, created_at"
+            " FROM minutes_legacy"
+        )
+        conn.execute("DROP TABLE minutes_legacy")
+        conn.execute(MINUTES_INDEX_SQL)
 
     # ---------- 写入 ----------
 
@@ -122,9 +180,14 @@ class SQLiteRepository:
         todos: list[dict] | None = None,
         model: str = "",
     ) -> int:
-        """保存一版纪要；旧版本保留（is_current=0），便于回滚。"""
+        """保存一版纪要；旧版本保留（is_current=0），便于回滚。
+
+        待办写独立的 todos 表，与纪要不在一张表里：
+        - `todos=None` 表示不碰已有待办；
+        - `todos=[]` 表示清空该会议的待办；
+        - 传入列表则整体覆盖（重新生成纪要不会把旧待办越堆越多）。
+        """
         ts = timestamp()
-        payload = json.dumps(todos or [], ensure_ascii=False)
         with self._connect() as conn:
             row = conn.execute(
                 "SELECT COALESCE(MAX(version), 0) AS v FROM minutes WHERE meeting_id = ?",
@@ -135,14 +198,39 @@ class SQLiteRepository:
                 "UPDATE minutes SET is_current = 0 WHERE meeting_id = ?", (meeting_id,)
             )
             cursor = conn.execute(
-                "INSERT INTO minutes (meeting_id, version, summary, content, todos, model,"
-                " is_current, created_at) VALUES (?, ?, ?, ?, ?, ?, 1, ?)",
-                (meeting_id, version, summary, content, payload, model, ts),
+                "INSERT INTO minutes (meeting_id, version, summary, content, model,"
+                " is_current, created_at) VALUES (?, ?, ?, ?, ?, 1, ?)",
+                (meeting_id, version, summary, content, model, ts),
             )
             conn.execute(
                 "UPDATE meetings SET updated_at = ? WHERE id = ?", (ts, meeting_id)
             )
+            if todos is not None:
+                self._replace_todos(conn, meeting_id, todos, ts)
             return int(cursor.lastrowid)
+
+    @staticmethod
+    def _replace_todos(
+        conn: sqlite3.Connection, meeting_id: int, todos: list[dict], ts: str
+    ) -> None:
+        conn.execute("DELETE FROM todos WHERE meeting_id = ?", (meeting_id,))
+        for item in todos:
+            if not isinstance(item, dict):
+                continue
+            content = str(item.get("content", "")).strip()
+            if not content:
+                continue
+            conn.execute(
+                "INSERT INTO todos (meeting_id, content, owner, due_date, status, created_at)"
+                " VALUES (?, ?, ?, ?, 'open', ?)",
+                (
+                    meeting_id,
+                    content,
+                    str(item.get("owner", "")).strip(),
+                    str(item.get("due_date", "")).strip(),
+                    ts,
+                ),
+            )
 
     def patch_meeting(
         self,
@@ -197,10 +285,11 @@ class SQLiteRepository:
     # ---------- 查询 ----------
 
     def get_meeting(self, meeting_id: int) -> dict[str, Any] | None:
+        """只返回纪要本身；待办在独立表，不会混进来。"""
         with self._connect() as conn:
             row = conn.execute(
                 "SELECT m.*, mi.id AS minutes_id, mi.version, mi.summary, mi.content,"
-                " mi.todos, mi.model, mi.is_current FROM meetings m"
+                " mi.model, mi.is_current FROM meetings m"
                 " LEFT JOIN minutes mi ON mi.meeting_id = m.id AND mi.is_current = 1"
                 " WHERE m.id = ?",
                 (meeting_id,),
@@ -215,7 +304,7 @@ class SQLiteRepository:
         with self._connect() as conn:
             rows = conn.execute(
                 "SELECT m.*, mi.id AS minutes_id, mi.version, mi.summary, mi.content,"
-                " mi.todos, mi.model, mi.is_current FROM meetings m"
+                " mi.model, mi.is_current FROM meetings m"
                 " LEFT JOIN minutes mi ON mi.meeting_id = m.id AND mi.is_current = 1"
                 " WHERE (? = '' OR m.title LIKE ? OR mi.summary LIKE ? OR mi.content LIKE ?)"
                 "   AND (? = '' OR m.meeting_date = ?)"
@@ -260,12 +349,30 @@ class SQLiteRepository:
             ).fetchall()
         return [dict(row) for row in rows]
 
+    # ---------- 待办（独立表，与纪要互不干扰） ----------
+
+    def list_todos(
+        self, meeting_id: int | None = None, status: str = "", limit: int = 100
+    ) -> list[dict[str, Any]]:
+        """按会议 / 状态查待办；带上会议标题与日期，方便直接展示。"""
+        sql = (
+            "SELECT t.id, t.meeting_id, t.content, t.owner, t.due_date, t.status,"
+            " t.created_at, m.title AS meeting_title, m.meeting_date"
+            " FROM todos t JOIN meetings m ON m.id = t.meeting_id WHERE 1 = 1"
+        )
+        params: list[Any] = []
+        if meeting_id is not None:
+            sql += " AND t.meeting_id = ?"
+            params.append(int(meeting_id))
+        if status:
+            sql += " AND t.status = ?"
+            params.append(status)
+        sql += " ORDER BY (t.due_date = ''), t.due_date, t.id LIMIT ?"
+        params.append(max(1, min(int(limit), 500)))
+        with self._connect() as conn:
+            rows = conn.execute(sql, params).fetchall()
+        return [dict(row) for row in rows]
+
     @staticmethod
     def _to_record(row: sqlite3.Row) -> dict[str, Any]:
-        record = dict(row)
-        todos_raw = record.pop("todos", "[]") or "[]"
-        try:
-            record["todos"] = json.loads(todos_raw)
-        except json.JSONDecodeError:
-            record["todos"] = []
-        return record
+        return dict(row)

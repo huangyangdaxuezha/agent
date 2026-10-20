@@ -43,6 +43,38 @@ def test_get_meeting_minutes_tool(tmp_path):
 
     assert result["id"] == meeting_id
     assert "下周一上线" in result["content"]
+    assert "todos" not in result
+
+
+def test_list_todos_tool_is_separate_from_minutes(tmp_path):
+    repository, registry = build(tmp_path)
+    meeting_id = repository.create_meeting(title="周会", meeting_date="2026-10-20")
+    repository.save_minutes(
+        meeting_id,
+        content="## 结论\n下周一上线",
+        todos=[{"content": "准备材料", "owner": "张三", "due_date": "2026-10-25"}],
+    )
+
+    minutes = json.loads(
+        registry.execute(tool_call("get_meeting_minutes", meeting_id=meeting_id)).content
+    )
+    todos = json.loads(registry.execute(tool_call("list_todos", meeting_id=meeting_id)).content)
+
+    assert "todos" not in minutes
+    assert todos["count"] == 1
+    assert todos["todos"][0]["content"] == "准备材料"
+    assert todos["todos"][0]["meeting_title"] == "周会"
+
+
+def test_list_todos_tool_without_meeting_id_returns_all(tmp_path):
+    repository, registry = build(tmp_path)
+    for title in ("A 会", "B 会"):
+        meeting_id = repository.create_meeting(title=title)
+        repository.save_minutes(meeting_id, content="正文", todos=[{"content": f"{title} 的待办"}])
+
+    result = json.loads(registry.execute(tool_call("list_todos")).content)
+
+    assert result["count"] == 2
 
 
 def test_update_meeting_tool_changes_only_requested_field(tmp_path):

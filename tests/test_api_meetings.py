@@ -101,3 +101,37 @@ def test_meeting_payload_hides_internal_columns(tmp_path):
 
     assert "minutes_id" not in data
     assert "is_current" not in data
+
+
+WITH_TODOS_JSON = json.dumps(
+    {
+        "title": "产品周会",
+        "summary": "确定上线时间",
+        "content": "## 结论\n下周一上线",
+        "todos": [{"content": "准备上线材料", "owner": "张三", "due_date": "2026-10-25"}],
+    },
+    ensure_ascii=False,
+)
+
+
+def test_meeting_detail_does_not_include_todos(tmp_path):
+    """需求：查会议纪要时不要看到待办数据。"""
+    client = build_client(tmp_path, FakeLLM([LLMResponse(content=WITH_TODOS_JSON)]))
+    meeting_id = client.post("/api/meetings/generate", json={"raw_text": "x"}).json()["id"]
+
+    detail = client.get(f"/api/meetings/{meeting_id}").json()
+
+    assert "todos" not in detail
+    assert "准备上线材料" not in json.dumps(detail, ensure_ascii=False)
+
+
+def test_todos_endpoint_returns_todos_separately(tmp_path):
+    client = build_client(tmp_path, FakeLLM([LLMResponse(content=WITH_TODOS_JSON)]))
+    meeting_id = client.post("/api/meetings/generate", json={"raw_text": "x"}).json()["id"]
+
+    data = client.get(f"/api/todos?meeting_id={meeting_id}").json()
+
+    assert data["count"] == 1
+    assert data["todos"][0]["content"] == "准备上线材料"
+    assert data["todos"][0]["owner"] == "张三"
+    assert data["todos"][0]["meeting_title"] == "产品周会"

@@ -109,16 +109,122 @@ def test_raw_text_is_not_persisted(tmp_path):
     assert "content" in columns
 
 
-def test_todos_table_is_reserved_for_future_module(tmp_path):
+def test_minutes_and_todos_live_in_separate_tables(tmp_path):
+    """分表要求：待办不写在 minutes 里，查纪要也拿不到待办。"""
     repo = make_repo(tmp_path)
-    meeting_id = new_meeting(repo)
+    meeting_id = repo.create_meeting(title="周会", meeting_date="2026-10-20")
+    repo.save_minutes(
+        meeting_id,
+        content="## 结论\n下周一上线",
+        summary="上线确定",
+        todos=[{"content": "准备上线材料", "owner": "张三", "due_date": "2026-10-25"}],
+    )
+
+    record = repo.get_meeting(meeting_id)
+    assert "todos" not in record
+    assert record["content"] == "## 结论\n下周一上线"
 
     with sqlite3.connect(str(tmp_path / "test.db")) as conn:
-        conn.execute(
-            "INSERT INTO todos (meeting_id, content, owner, due_date, status, created_at)"
-            " VALUES (?, ?, ?, ?, 'open', '2026-10-20T00:00:00')",
-            (meeting_id, "准备上线材料", "张三", "2026-10-25"),
-        )
-        count = conn.execute("SELECT COUNT(*) FROM todos").fetchone()[0]
+        minutes_columns = {row[1] for row in conn.execute("PRAGMA table_info(minutes)")}
+        todos_count = conn.execute("SELECT COUNT(*) FROM todos").fetchone()[0]
 
-    assert count == 1
+    assert "todos" not in minutes_columns
+    assert todos_count == 1
+
+
+def test_list_todos_returns_meeting_context(tmp_path):
+    repo = make_repo(tmp_path)
+    meeting_id = repo.create_meeting(title="周会", meeting_date="2026-10-20")
+    repo.save_minutes(
+        meeting_id,
+        content="正文",
+        todos=[
+            {"content": "准备材料", "owner": "张三", "due_date": "2026-10-25"},
+            {"content": "通知客户", "owner": ""},
+        ],
+    )
+
+    todos = repo.list_todos()
+
+    assert [t["content"] for t in todos] == ["准备材料", "通知客户"]
+    assert todos[0]["meeting_title"] == "周会"
+    assert todos[0]["status"] == "open"
+    assert todos[0]["owner"] == "张三"
+
+
+def test_list_todos_filters_by_meeting_and_status(tmp_path):
+    repo = make_repo(tmp_path)
+    first = repo.create_meeting(title="A")
+    second = repo.create_meeting(title="B")
+    repo.save_minutes(first, content="a", todos=[{"content": "A 的待办"}])
+    repo.save_minutes(second, content="b", todos=[{"content": "B 的待办"}])
+
+    assert [t["content"] for t in repo.list_todos(meeting_id=first)] == ["A 的待办"]
+    assert repo.list_todos(status="done") == []
+
+
+def test_regenerating_minutes_replaces_todos(tmp_path):
+    """重新生成纪要时待办整体覆盖，不会越堆越多。"""
+    repo = make_repo(tmp_path)
+    meeting_id = repo.create_meeting(title="周会")
+    repo.save_minutes(meeting_id, content="第一版", todos=[{"content": "旧待办"}])
+
+    repo.save_minutes(meeting_id, content="第二版", todos=[{"content": "新待办"}])
+
+    assert [t["content"] for t in repo.list_todos(meeting_id=meeting_id)] == ["新待办"]
+
+
+def test_missing_todos_argument_keeps_existing_todos(tmp_path):
+    repo = make_repo(tmp_path)
+    meeting_id = repo.create_meeting(title="周会")
+    repo.save_minutes(meeting_id, content="第一版", todos=[{"content": "保留的待办"}])
+
+    repo.save_minutes(meeting_id, content="第二版")
+
+    assert [t["content"] for t in repo.list_todos()] == ["保留的待办"]
+
+
+def test_legacy_todos_column_is_migrated(tmp_path):
+    """旧库（待办是 minutes.todos 里的 JSON）升级后自动搬到独立表。"""
+    db = tmp_path / "legacy.db"
+    with sqlite3.connect(str(db)) as conn:
+        conn.executescript(
+            """
+            CREATE TABLE meetings (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                title TEXT NOT NULL DEFAULT '',
+                meeting_date TEXT NOT NULL DEFAULT '',
+                owner TEXT NOT NULL DEFAULT 'local',
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+            CREATE TABLE minutes (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                meeting_id INTEGER NOT NULL REFERENCES meetings(id) ON DELETE CASCADE,
+                version INTEGER NOT NULL DEFAULT 1,
+                summary TEXT NOT NULL DEFAULT '',
+                content TEXT NOT NULL,
+                todos TEXT NOT NULL DEFAULT '[]',
+                model TEXT NOT NULL DEFAULT '',
+                is_current INTEGER NOT NULL DEFAULT 1,
+                created_at TEXT NOT NULL
+            );
+            INSERT INTO meetings (title, meeting_date, created_at, updated_at)
+                VALUES ('旧会议', '2026-10-01', 't', 't');
+            INSERT INTO minutes (meeting_id, version, summary, content, todos, model, is_current, created_at)
+                VALUES (1, 1, '', '旧正文',
+                        '[{"content":"跟进预算","owner":"李四","due_date":"2026-10-30"}]',
+                        'm', 1, 't');
+            """
+        )
+
+    repo = SQLiteRepository(db)
+
+    assert [t["content"] for t in repo.list_todos()] == ["跟进预算"]
+    record = repo.get_meeting(1)
+    assert record["content"] == "旧正文"
+    assert "todos" not in record
+
+    with sqlite3.connect(str(db)) as conn:
+        minutes_columns = {row[1] for row in conn.execute("PRAGMA table_info(minutes)")}
+    assert "todos" not in minutes_columns

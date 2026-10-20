@@ -78,14 +78,16 @@ def validate_session_id(session_id: str) -> str:
 
 
 def public_meeting(record: dict) -> dict[str, Any]:
-    """只暴露对外字段，隐藏内部列。"""
+    """只暴露对外字段，隐藏内部列。
+
+    待办已独立成表，这里**不返回** todos：查纪要时不会看到待办数据。
+    """
     return {
         "id": record["id"],
         "title": record["title"],
         "meeting_date": record["meeting_date"],
         "summary": record.get("summary") or "",
         "content": record.get("content") or "",
-        "todos": record.get("todos") or [],
         "version": record.get("version"),
         "updated_at": record["updated_at"],
     }
@@ -199,6 +201,14 @@ def create_app(
         if record is None:
             raise HTTPException(status_code=404, detail="会议不存在")
         return public_meeting(record)
+
+    @app.get("/api/todos")
+    def list_todos(meeting_id: int | None = None, status: str = "", limit: int = 100) -> dict:
+        """待办独立接口：与纪要分开查，不会混在纪要详情里。"""
+        rows = repository.list_todos(
+            meeting_id=meeting_id, status=status, limit=max(1, min(limit, 200))
+        )
+        return {"count": len(rows), "todos": rows}
 
     @app.patch("/api/meetings/{meeting_id}")
     def patch_meeting(meeting_id: int, payload: MeetingPatch) -> dict:
