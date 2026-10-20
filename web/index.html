@@ -54,6 +54,8 @@
   .error { color:#dc2626; font-size:13px; }
 
   #library { flex:1; display:flex; min-height:0; padding:16px; gap:16px; }
+  #todos-view { flex:1; display:flex; min-height:0; padding:16px; }
+  #todos-view .panel { width:100%; max-width:760px; margin:0 auto; }
   .panel { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:14px;
     display:flex; flex-direction:column; min-height:0; }
   .left { width:340px; flex:0 0 340px; }
@@ -83,7 +85,8 @@
   <h1>会议小助手</h1>
   <div class="tabs">
     <button id="tab-chat" class="active">对话</button>
-    <button id="tab-lib">纪要库</button>
+    <button id="tab-lib">会议纪要</button>
+    <button id="tab-todos">待办</button>
   </div>
   <span class="model" id="model">加载中…</span>
   <span class="spacer"></span>
@@ -113,6 +116,20 @@
 </section>
 
 <!-- 纪要库视图 -->
+<!-- 待办视图：与会议纪要完全分离的独立列表 -->
+<section id="todos-view" class="hidden">
+  <div class="panel">
+    <h3>待办列表</h3>
+    <div class="row">
+      <button class="btn ghost" id="todo-all">全部</button>
+      <button class="btn ghost" id="todo-open">未完成</button>
+      <span class="meta" id="todo-count"></span>
+    </div>
+    <div class="list" id="todo-list"></div>
+  </div>
+</section>
+
+<!-- 会议纪要视图 -->
 <section id="library" class="hidden">
   <div class="panel left">
     <h3>导入会议原文</h3>
@@ -166,12 +183,16 @@
   function switchTab(name) {
     document.getElementById('chat').classList.toggle('hidden', name !== 'chat');
     document.getElementById('library').classList.toggle('hidden', name !== 'lib');
+    document.getElementById('todos-view').classList.toggle('hidden', name !== 'todos');
     document.getElementById('tab-chat').classList.toggle('active', name === 'chat');
     document.getElementById('tab-lib').classList.toggle('active', name === 'lib');
+    document.getElementById('tab-todos').classList.toggle('active', name === 'todos');
     if (name === 'lib') loadMeetings();
+    if (name === 'todos') loadTodos();
   }
   document.getElementById('tab-chat').onclick = () => switchTab('chat');
   document.getElementById('tab-lib').onclick = () => switchTab('lib');
+  document.getElementById('tab-todos').onclick = () => switchTab('todos');
 
   /* ---------- 对话 ---------- */
   function scrollBottom() { mainEl.scrollTop = mainEl.scrollHeight; }
@@ -210,6 +231,7 @@
       localStorage.setItem(KEY, sessionId);
       thinking.querySelector('.bubble').textContent = data.reply || '（无回复）';
       loadMeetings();
+      if (!document.getElementById('todos-view').classList.contains('hidden')) loadTodos();
     } catch (e) {
       const b = thinking.querySelector('.bubble');
       b.className = 'bubble error';
@@ -246,6 +268,41 @@
         meetingsEl.appendChild(item);
       });
     } catch (e) { meetingsEl.innerHTML = '<div class="meta">加载失败</div>'; }
+  }
+
+  /* ---------- 待办（独立列表，只查 todos 表） ---------- */
+  let todoStatus = '';
+
+  async function loadTodos(status) {
+    if (status !== undefined) todoStatus = status;
+    const box = document.getElementById('todo-list');
+    try {
+      const query = '/api/todos?limit=200' +
+        (todoStatus ? '&status=' + encodeURIComponent(todoStatus) : '');
+      const data = await api.json(query);
+      document.getElementById('todo-count').textContent = `共 ${data.count} 项`;
+      box.innerHTML = '';
+      if (!data.count) { box.innerHTML = '<div class="meta">暂无待办</div>'; return; }
+      data.todos.forEach(t => {
+        const item = document.createElement('div');
+        item.className = 'item';
+        const title = document.createElement('div');
+        title.className = 't';
+        title.textContent = t.content;
+        const meta = document.createElement('div');
+        meta.className = 'm';
+        meta.textContent = [
+          t.owner ? `负责人：${t.owner}` : '负责人：未指定',
+          t.due_date ? `截止：${t.due_date}` : '截止：未指定',
+          t.meeting_title ? `来源：${t.meeting_title}` : '',
+        ].filter(Boolean).join(' · ');
+        item.appendChild(title);
+        item.appendChild(meta);
+        box.appendChild(item);
+      });
+    } catch (e) {
+      box.innerHTML = '<div class="meta">加载失败</div>';
+    }
   }
 
   async function openMeeting(id) {
@@ -305,6 +362,8 @@
   };
 
   sendBtn.onclick = send;
+  document.getElementById('todo-all').onclick = () => loadTodos('');
+  document.getElementById('todo-open').onclick = () => loadTodos('open');
   document.getElementById('gen').onclick = generate;
   document.getElementById('save').onclick = saveDetail;
   document.getElementById('refresh').onclick = () => loadMeetings(document.getElementById('kw').value);

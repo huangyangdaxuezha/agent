@@ -31,6 +31,8 @@ def test_list_meetings_tool(tmp_path):
 
     assert result["count"] == 1
     assert result["meetings"][0]["title"] == "预算评审"
+    # 列表里不带摘要/待办，只有定位用的基本信息
+    assert set(result["meetings"][0]) == {"id", "title", "meeting_date", "updated_at"}
 
 
 def test_get_meeting_minutes_tool(tmp_path):

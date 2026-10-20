@@ -42,12 +42,12 @@ def register_minutes_tools(
         rows = repository.search_meetings(
             keyword=keyword, meeting_date=meeting_date, limit=max(1, min(int(limit), 50))
         )
+        # 列表只给必要字段：不带摘要/正文，避免和待办内容混在一起
         brief = [
             {
                 "id": row["id"],
                 "title": row["title"],
                 "meeting_date": row["meeting_date"],
-                "summary": row.get("summary") or "",
                 "updated_at": row["updated_at"],
             }
             for row in rows
