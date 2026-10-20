@@ -120,6 +120,35 @@ def test_step_limit_stops_infinite_loop():
     assert loop.llm.call_count == 3
 
 
+def test_tool_history_is_protocol_valid_on_next_turn():
+    """工具调用后，下一次请求里 tool 消息必须紧跟带 tool_calls 的 assistant，否则模型 400。"""
+    registry = ToolRegistry()
+
+    @registry.register(name="update_meeting")
+    def update_meeting(title: str = "") -> str:
+        return "ok"
+
+    loop = build_loop(
+        FakeLLM(
+            [
+                LLMResponse(content="", tool_calls=(tool_call("update_meeting", title="新标题"),)),
+                LLMResponse(content="已修改"),
+                LLMResponse(content="第二句回复"),
+            ]
+        ),
+        tools=registry,
+    )
+    loop.run("改标题")
+    loop.run("再问一句")
+
+    request = loop.llm.calls[2]
+    tool_index = next(i for i, m in enumerate(request) if m.role == "tool")
+    assistant = request[tool_index - 1]
+    assert assistant.role == "assistant"
+    assert assistant.tool_calls
+    assert assistant.tool_calls[0].id == request[tool_index].tool_call_id
+
+
 def test_default_config_stops_after_five_steps():
     registry = ToolRegistry()
 

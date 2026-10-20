@@ -13,13 +13,27 @@ Role = Literal["system", "user", "assistant", "tool"]
 
 
 @dataclass(frozen=True)
+class ToolCall:
+    """模型发起的一次工具调用请求。"""
+
+    id: str
+    name: str
+    arguments: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
 class Message:
-    """一条对话消息。tool 角色时携带 name 与 tool_call_id。"""
+    """一条对话消息。
+
+    assistant 发起的工具调用必须随消息一起保留（tool_calls），
+    否则历史里的 tool 消息会变成"孤儿"，OpenAI 兼容接口会直接 400。
+    """
 
     role: Role
     content: str = ""
     name: str | None = None
     tool_call_id: str | None = None
+    tool_calls: tuple[ToolCall, ...] = ()
 
     def to_dict(self) -> dict[str, Any]:
         data: dict[str, Any] = {"role": self.role, "content": self.content}
@@ -27,16 +41,19 @@ class Message:
             data["name"] = self.name
         if self.tool_call_id:
             data["tool_call_id"] = self.tool_call_id
+        if self.tool_calls:
+            data["tool_calls"] = [
+                {
+                    "id": call.id,
+                    "type": "function",
+                    "function": {
+                        "name": call.name,
+                        "arguments": json.dumps(call.arguments, ensure_ascii=False),
+                    },
+                }
+                for call in self.tool_calls
+            ]
         return data
-
-
-@dataclass(frozen=True)
-class ToolCall:
-    """模型发起的一次工具调用请求。"""
-
-    id: str
-    name: str
-    arguments: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)

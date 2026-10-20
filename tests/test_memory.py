@@ -58,6 +58,26 @@ def test_store_load_missing_file_returns_empty(tmp_path):
     assert JsonSessionStore(tmp_path / "nope.json").load() == []
 
 
+def test_store_round_trip_keeps_tool_calls(tmp_path):
+    from meeting_agent.core.types import ToolCall
+
+    store = JsonSessionStore(tmp_path / "s.json")
+    original = [
+        Message(
+            role="assistant",
+            content="",
+            tool_calls=(ToolCall(id="c1", name="update_meeting", arguments={"meeting_id": 1}),),
+        ),
+        Message(role="tool", content="ok", name="update_meeting", tool_call_id="c1"),
+    ]
+    store.save(original)
+
+    loaded = store.load()
+    assert loaded[0].tool_calls[0].id == "c1"
+    assert loaded[0].tool_calls[0].arguments == {"meeting_id": 1}
+    assert loaded[1].tool_call_id == "c1"
+
+
 def test_store_invalid_json_raises(tmp_path):
     path = tmp_path / "bad.json"
     path.write_text("{not json", encoding="utf-8")

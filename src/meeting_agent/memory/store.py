@@ -6,7 +6,7 @@ import json
 from collections.abc import Sequence
 from pathlib import Path
 
-from ..core.types import Message
+from ..core.types import Message, ToolCall, parse_tool_arguments
 
 
 class SessionStoreError(RuntimeError):
@@ -36,13 +36,26 @@ class JsonSessionStore:
             raise SessionStoreError(f"会话文件解析失败: {self.path}") from exc
         if not isinstance(raw, list):
             raise SessionStoreError("会话文件格式错误：顶层应为数组")
-        return [
-            Message(
-                role=item.get("role", "user"),
-                content=str(item.get("content", "")),
-                name=item.get("name"),
-                tool_call_id=item.get("tool_call_id"),
+        messages: list[Message] = []
+        for item in raw:
+            if not isinstance(item, dict):
+                continue
+            calls = tuple(
+                ToolCall(
+                    id=str(call.get("id", "")),
+                    name=str(call.get("function", {}).get("name", "")),
+                    arguments=parse_tool_arguments(call.get("function", {}).get("arguments")),
+                )
+                for call in item.get("tool_calls") or []
+                if isinstance(call, dict)
             )
-            for item in raw
-            if isinstance(item, dict)
-        ]
+            messages.append(
+                Message(
+                    role=item.get("role", "user"),
+                    content=str(item.get("content", "")),
+                    name=item.get("name"),
+                    tool_call_id=item.get("tool_call_id"),
+                    tool_calls=calls,
+                )
+            )
+        return messages

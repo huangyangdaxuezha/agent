@@ -76,6 +76,30 @@ def test_chat_parses_tool_calls(monkeypatch):
     assert response.tool_calls[0].arguments == {"owner": "张三"}
 
 
+def test_payload_keeps_tool_call_pairing(monkeypatch):
+    from meeting_agent.core.types import ToolCall
+
+    captured = install_fake_urlopen(monkeypatch, {"choices": [{"message": {"content": "ok"}}]})
+    client = OpenAICompatibleClient("https://api.example.com/v1", "sk-test", "gpt-x")
+
+    client.chat(
+        [
+            Message(
+                role="assistant",
+                content="",
+                tool_calls=(ToolCall(id="c1", name="t", arguments={"a": 1}),),
+            ),
+            Message(role="tool", content="result", name="t", tool_call_id="c1"),
+        ]
+    )
+
+    payload = json.loads(captured["request"].data)
+    assert payload["messages"][0]["tool_calls"][0]["id"] == "c1"
+    assert payload["messages"][0]["tool_calls"][0]["function"]["name"] == "t"
+    assert payload["messages"][1]["role"] == "tool"
+    assert payload["messages"][1]["tool_call_id"] == "c1"
+
+
 def test_tools_are_serialized_into_payload(monkeypatch):
     from meeting_agent.tools.registry import ToolSpec
 

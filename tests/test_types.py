@@ -17,6 +17,24 @@ def test_message_to_dict_keeps_tool_metadata():
     assert data["tool_call_id"] == "c1"
 
 
+def test_assistant_message_serializes_tool_calls_for_api():
+    message = Message(
+        role="assistant",
+        content="",
+        tool_calls=(ToolCall(id="c1", name="update_meeting", arguments={"meeting_id": 1}),),
+    )
+    data = message.to_dict()
+
+    assert data["tool_calls"][0]["id"] == "c1"
+    assert data["tool_calls"][0]["type"] == "function"
+    assert data["tool_calls"][0]["function"]["name"] == "update_meeting"
+    assert '"meeting_id": 1' in data["tool_calls"][0]["function"]["arguments"]
+
+
+def test_message_without_tool_calls_has_no_key():
+    assert "tool_calls" not in Message(role="assistant", content="hi").to_dict()
+
+
 def test_llm_response_detects_tool_calls():
     assert not LLMResponse(content="ok").has_tool_calls
     assert LLMResponse(tool_calls=(ToolCall(id="1", name="demo"),)).has_tool_calls

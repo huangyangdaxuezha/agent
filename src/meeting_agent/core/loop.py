@@ -58,7 +58,13 @@ class AgentLoop:
                 self.memory.add(Message(role="assistant", content=response.content))
                 return response.content
 
-            self.memory.add(Message(role="assistant", content=response.content))
+            self.memory.add(
+                Message(
+                    role="assistant",
+                    content=response.content,
+                    tool_calls=response.tool_calls,
+                )
+            )
             self._run_tools(step, response)
 
         notice = f"[已达到最大步数 {self.config.max_steps}，提前结束本轮]"
